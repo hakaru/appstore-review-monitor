@@ -118,7 +118,7 @@ async function run() {
     const keyId = core.getInput('asc-key-id', { required: true });
     const issuerId = core.getInput('asc-issuer-id', { required: true });
     const privateKey = core.getInput('asc-private-key', { required: true });
-    const token = core.getInput('github-token', { required: true });
+    const token = core.getInput('github-token') || process.env.GITHUB_TOKEN;
     const issueLabel = core.getInput('issue-label') || 'asc-monitor';
     const versionId = core.getInput('version-id') || '';
 

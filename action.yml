@@ -20,8 +20,8 @@ inputs:
     description: 'App Store Connect API Private Key (.p8 contents)'
     required: true
   github-token:
-    description: 'GitHub token for creating issues'
-    default: ${{ github.token }}
+    description: 'GitHub token for creating issues (defaults to github.token)'
+    required: false
   issue-label:
     description: 'Label for status cache issues'
     default: 'asc-monitor'
