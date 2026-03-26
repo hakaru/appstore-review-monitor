@@ -1,6 +1,6 @@
 # App Store Review Monitor
 
-A GitHub Action that monitors your App Store Connect review status and creates GitHub Issues on status changes.
+A GitHub Action that monitors your App Store Connect review status and creates GitHub Issues on status changes. Supports Slack, Discord, and Microsoft Teams notifications.
 
 ## Features
 
@@ -9,6 +9,7 @@ A GitHub Action that monitors your App Store Connect review status and creates G
 - Detailed rejection information when app is rejected
 - Status emoji for quick visual scanning
 - Tracks previous status via issue labels (no external storage needed)
+- Optional notifications to **Slack**, **Discord**, and **Microsoft Teams**
 
 ## Usage
 
@@ -31,6 +32,11 @@ jobs:
           asc-key-id: ${{ secrets.ASC_KEY_ID }}
           asc-issuer-id: ${{ secrets.ASC_ISSUER_ID }}
           asc-private-key: ${{ secrets.ASC_PRIVATE_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: add notification channels
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          discord-webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          teams-webhook-url: ${{ secrets.TEAMS_WEBHOOK }}
 ```
 
 ## Inputs
@@ -41,9 +47,12 @@ jobs:
 | `asc-key-id` | Yes | API Key ID |
 | `asc-issuer-id` | Yes | Issuer ID |
 | `asc-private-key` | Yes | `.p8` private key contents |
-| `github-token` | No | GitHub token (defaults to `${{ github.token }}`) |
+| `github-token` | No | GitHub token (defaults to `GITHUB_TOKEN` env) |
 | `issue-label` | No | Label for cache issues (default: `asc-monitor`) |
 | `version-id` | No | Specific version ID to monitor (defaults to latest) |
+| `slack-webhook-url` | No | Slack Incoming Webhook URL |
+| `discord-webhook-url` | No | Discord Webhook URL |
+| `teams-webhook-url` | No | Microsoft Teams Incoming Webhook URL |
 
 ## Outputs
 
@@ -54,14 +63,45 @@ jobs:
 | `changed` | Whether status changed (`true`/`false`) |
 | `issue-number` | Created issue number (if changed) |
 
+## Notifications
+
+### GitHub Issues (always enabled)
+
+Status changes are tracked via labeled issues. Old status issues are auto-closed when status changes.
+
+### Slack
+
+Sends rich messages with color-coded attachments.
+
+1. Create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) in your Slack workspace
+2. Add the webhook URL as `SLACK_WEBHOOK` secret
+
+### Discord
+
+Sends embedded messages with status fields.
+
+1. Go to your Discord channel > Settings > Integrations > Webhooks
+2. Create a webhook and copy the URL
+3. Add as `DISCORD_WEBHOOK` secret
+
+### Microsoft Teams
+
+Sends Adaptive Card messages.
+
+1. In your Teams channel, add an Incoming Webhook connector
+2. Copy the webhook URL
+3. Add as `TEAMS_WEBHOOK` secret
+
 ## Status Notifications
 
-| Status | Issue Title |
-|--------|------------|
-| 🕐 WAITING_FOR_REVIEW | App Store Review: WAITING_FOR_REVIEW |
-| 🔍 IN_REVIEW | App Store Review: IN_REVIEW |
-| 🚨 REJECTED | App Store Review REJECTED |
-| 🎉 READY_FOR_DISTRIBUTION | App Store Review APPROVED |
+| Status | Emoji | Color |
+|--------|-------|-------|
+| WAITING_FOR_REVIEW | 🕐 | Blue |
+| IN_REVIEW | 🔍 | Blue |
+| REJECTED | 🚨 | Red |
+| READY_FOR_DISTRIBUTION | 🎉 | Green |
+| PROCESSING_FOR_DISTRIBUTION | ⏳ | Blue |
+| PENDING_DEVELOPER_RELEASE | 📦 | Blue |
 
 ## Setup
 
@@ -78,6 +118,10 @@ gh secret set ASC_KEY_ID --body "YOUR_KEY_ID"
 gh secret set ASC_ISSUER_ID --body "YOUR_ISSUER_ID"
 gh secret set ASC_PRIVATE_KEY < AuthKey_XXXXXXXX.p8
 gh secret set APP_STORE_APP_ID --body "YOUR_APP_ID"
+# Optional
+gh secret set SLACK_WEBHOOK --body "https://hooks.slack.com/services/..."
+gh secret set DISCORD_WEBHOOK --body "https://discord.com/api/webhooks/..."
+gh secret set TEAMS_WEBHOOK --body "https://outlook.office.com/webhook/..."
 ```
 
 ### 3. Find Your App ID

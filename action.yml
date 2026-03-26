@@ -28,6 +28,15 @@ inputs:
   version-id:
     description: 'Specific App Store Version ID to monitor (optional, defaults to latest)'
     required: false
+  slack-webhook-url:
+    description: 'Slack Incoming Webhook URL for notifications (optional)'
+    required: false
+  discord-webhook-url:
+    description: 'Discord Webhook URL for notifications (optional)'
+    required: false
+  teams-webhook-url:
+    description: 'Microsoft Teams Incoming Webhook URL for notifications (optional)'
+    required: false
 
 outputs:
   status:

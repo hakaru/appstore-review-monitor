@@ -52,10 +52,7 @@ async function ascFetch(path, jwt) {
 
 async function getLatestVersion(appId, jwt, versionId) {
   if (versionId) {
-    const data = await ascFetch(
-      `/appStoreVersions/${versionId}`,
-      jwt
-    );
+    const data = await ascFetch(`/appStoreVersions/${versionId}`, jwt);
     return data.data;
   }
 
@@ -112,6 +109,110 @@ async function getRejectionDetails(versionId, appId, jwt) {
   return details;
 }
 
+// --- Notification helpers ---
+
+async function notifySlack(webhookUrl, { title, emoji, versionString, previousStatus, currentStatus, isRejected, issueUrl }) {
+  const color = isRejected ? '#dc3545' : currentStatus === 'READY_FOR_DISTRIBUTION' ? '#28a745' : '#0969da';
+  const payload = {
+    attachments: [{
+      color,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `${emoji} *${title}*\n\n` +
+              `*Version:* ${versionString}\n` +
+              `*Previous:* ${previousStatus ?? 'N/A'}\n` +
+              `*Current:* ${currentStatus}\n` +
+              (issueUrl ? `*Issue:* <${issueUrl}|View on GitHub>` : '')
+          }
+        }
+      ]
+    }]
+  };
+
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(`Slack webhook ${res.status}: ${await res.text()}`);
+  core.info('Slack notification sent');
+}
+
+async function notifyDiscord(webhookUrl, { title, emoji, versionString, previousStatus, currentStatus, isRejected, issueUrl }) {
+  const color = isRejected ? 0xdc3545 : currentStatus === 'READY_FOR_DISTRIBUTION' ? 0x28a745 : 0x0969da;
+  const payload = {
+    embeds: [{
+      title: `${emoji} ${title}`,
+      color,
+      fields: [
+        { name: 'Version', value: versionString, inline: true },
+        { name: 'Previous', value: previousStatus ?? 'N/A', inline: true },
+        { name: 'Current', value: currentStatus, inline: true },
+      ],
+      url: issueUrl || undefined,
+      timestamp: new Date().toISOString()
+    }]
+  };
+
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(`Discord webhook ${res.status}: ${await res.text()}`);
+  core.info('Discord notification sent');
+}
+
+async function notifyTeams(webhookUrl, { title, emoji, versionString, previousStatus, currentStatus, isRejected, issueUrl }) {
+  const color = isRejected ? 'attention' : currentStatus === 'READY_FOR_DISTRIBUTION' ? 'good' : 'default';
+  const payload = {
+    type: 'message',
+    attachments: [{
+      contentType: 'application/vnd.microsoft.card.adaptive',
+      content: {
+        $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
+        type: 'AdaptiveCard',
+        version: '1.4',
+        body: [
+          {
+            type: 'TextBlock',
+            text: `${emoji} ${title}`,
+            weight: 'bolder',
+            size: 'medium',
+            style: color
+          },
+          {
+            type: 'FactSet',
+            facts: [
+              { title: 'Version', value: versionString },
+              { title: 'Previous', value: previousStatus ?? 'N/A' },
+              { title: 'Current', value: currentStatus },
+            ]
+          }
+        ],
+        actions: issueUrl ? [{
+          type: 'Action.OpenUrl',
+          title: 'View on GitHub',
+          url: issueUrl
+        }] : []
+      }
+    }]
+  };
+
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(`Teams webhook ${res.status}: ${await res.text()}`);
+  core.info('Teams notification sent');
+}
+
+// --- Main ---
+
 async function run() {
   try {
     const appId = core.getInput('app-id', { required: true });
@@ -121,6 +222,9 @@ async function run() {
     const token = core.getInput('github-token') || process.env.GITHUB_TOKEN;
     const issueLabel = core.getInput('issue-label') || 'asc-monitor';
     const versionId = core.getInput('version-id') || '';
+    const slackWebhookUrl = core.getInput('slack-webhook-url') || '';
+    const discordWebhookUrl = core.getInput('discord-webhook-url') || '';
+    const teamsWebhookUrl = core.getInput('teams-webhook-url') || '';
 
     const jwt = generateJWT(keyId, issuerId, privateKey);
     const octokit = github.getOctokit(token);
@@ -213,8 +317,27 @@ async function run() {
       labels
     });
 
+    const issueUrl = newIssue.html_url;
     core.info(`Created issue #${newIssue.number}: ${title}`);
     core.setOutput('issue-number', String(newIssue.number));
+
+    // Send notifications to external services
+    const notifyContext = { title, emoji, versionString, previousStatus, currentStatus, isRejected, issueUrl };
+
+    if (slackWebhookUrl) {
+      try { await notifySlack(slackWebhookUrl, notifyContext); }
+      catch (e) { core.warning(`Slack notification failed: ${e.message}`); }
+    }
+
+    if (discordWebhookUrl) {
+      try { await notifyDiscord(discordWebhookUrl, notifyContext); }
+      catch (e) { core.warning(`Discord notification failed: ${e.message}`); }
+    }
+
+    if (teamsWebhookUrl) {
+      try { await notifyTeams(teamsWebhookUrl, notifyContext); }
+      catch (e) { core.warning(`Teams notification failed: ${e.message}`); }
+    }
 
   } catch (error) {
     core.setFailed(error.message);
