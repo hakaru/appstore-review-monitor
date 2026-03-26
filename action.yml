@@ -1,0 +1,44 @@
+name: 'App Store Review Monitor'
+description: 'Monitor App Store Connect review status and create GitHub Issues on status changes'
+author: 'hakaru'
+
+branding:
+  icon: 'eye'
+  color: 'blue'
+
+inputs:
+  app-id:
+    description: 'App Store Connect App ID'
+    required: true
+  asc-key-id:
+    description: 'App Store Connect API Key ID'
+    required: true
+  asc-issuer-id:
+    description: 'App Store Connect Issuer ID'
+    required: true
+  asc-private-key:
+    description: 'App Store Connect API Private Key (.p8 contents)'
+    required: true
+  github-token:
+    description: 'GitHub token for creating issues'
+    default: ${{ github.token }}
+  issue-label:
+    description: 'Label for status cache issues'
+    default: 'asc-monitor'
+  version-id:
+    description: 'Specific App Store Version ID to monitor (optional, defaults to latest)'
+    required: false
+
+outputs:
+  status:
+    description: 'Current review status'
+  version:
+    description: 'Version string'
+  changed:
+    description: 'Whether status changed (true/false)'
+  issue-number:
+    description: 'Created issue number (if status changed)'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
